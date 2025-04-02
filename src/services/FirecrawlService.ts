@@ -204,9 +204,20 @@ export class FirecrawlService {
   static async saveSearchQuery(query: string): Promise<string | null> {
     try {
       console.log('Saving search query to Supabase:', query);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        return null;
+      }
+
       const { data, error } = await supabase
         .from('searches')
-        .insert({ query })
+        .insert({ 
+          query,
+          user_id: user.id
+        })
         .select('id')
         .single();
       

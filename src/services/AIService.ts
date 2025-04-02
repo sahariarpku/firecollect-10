@@ -11,7 +11,7 @@ export interface AIModel {
   is_default: boolean;
   created_at: string;
   updated_at: string;
-  user_id: string | null;
+  user_id?: string | null;
 }
 
 export type AIProvider = 'openai' | 'google' | 'anthropic' | 'deepseek' | 'openrouter' | 'siliconflow';
@@ -49,7 +49,22 @@ export class AIService {
         throw error;
       }
       
-      return data || [];
+      if (!data) {
+        return [];
+      }
+
+      return data.map(item => ({
+        id: item.id,
+        name: item.name,
+        provider: item.provider,
+        api_key: item.api_key,
+        base_url: item.base_url,
+        model_name: item.model_name,
+        is_default: item.is_default,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        user_id: item.user_id
+      }));
     } catch (error) {
       console.error('Error in getModels:', error);
       return [];
@@ -72,7 +87,22 @@ export class AIService {
         throw error;
       }
       
-      return data;
+      if (!data) {
+        return null;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        provider: data.provider,
+        api_key: data.api_key,
+        base_url: data.base_url,
+        model_name: data.model_name,
+        is_default: data.is_default,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        user_id: data.user_id
+      };
     } catch (error) {
       console.error('Error in getDefaultModel:', error);
       return null;
@@ -174,7 +204,7 @@ export class AIService {
       // First verify the model belongs to the user
       const { data: model, error: fetchError } = await supabase
         .from('ai_models')
-        .select('*')
+        .select('id, user_id')
         .eq('id', id)
         .single();
 
@@ -182,7 +212,13 @@ export class AIService {
         throw new Error('Failed to fetch model details');
       }
 
-      if (!model || model.user_id !== user.id) {
+      if (!model) {
+        throw new Error('Model not found');
+      }
+
+      // Type assertion for the model data
+      const modelData = model as { id: string; user_id: string | null };
+      if (modelData.user_id !== user.id) {
         throw new Error('You do not have permission to delete this model');
       }
 
@@ -191,7 +227,7 @@ export class AIService {
         .from('ai_models')
         .delete()
         .eq('id', id)
-        .eq('user_id', user.id); // Add user_id check for extra security
+        .eq('user_id', user.id);
 
       if (deleteError) {
         throw deleteError;
@@ -305,6 +341,20 @@ export class AIService {
           }
           break;
           
+        case 'deepseek':
+          // Test actual connection to DeepSeek
+          try {
+            const testResult = await this.deepseekTest(model);
+            if (!testResult) {
+              toast.error('Failed to connect to DeepSeek API');
+              return false;
+            }
+          } catch (error) {
+            toast.error(`DeepSeek connection error: ${error.message}`);
+            return false;
+          }
+          break;
+          
         case 'siliconflow':
           // Test actual connection to SiliconFlow
           try {
@@ -347,6 +397,49 @@ export class AIService {
       console.error('Error testing connection:', error);
       toast.error(`Failed to connect to ${model.provider}: ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Test connection to DeepSeek API
+   */
+  private static async deepseekTest(model: AIModel | AIModelInput): Promise<boolean> {
+    const baseUrl = model.base_url || 'https://api.deepseek.com';
+    const endpoint = `${baseUrl}/v1/chat/completions`;
+    
+    const payload = {
+      model: model.model_name || 'deepseek-chat',
+      messages: [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: "Hello, are you operational?" }
+      ],
+      max_tokens: 50,
+      temperature: 0.7
+    };
+    
+    try {
+      console.log('Testing DeepSeek connection with payload:', JSON.stringify(payload, null, 2));
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${model.api_key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const responseData = await response.json();
+      console.log('DeepSeek test response:', responseData);
+      
+      if (!response.ok) {
+        throw new Error(responseData.error?.message || `API Error: ${response.status}`);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('DeepSeek test error:', error);
+      throw error;
     }
   }
 
@@ -480,6 +573,8 @@ Your response should be clear, factual, and directly reference the papers when a
           return await this.generateGoogleCompletion(model, promptContent);
         case 'openrouter':
           return await this.generateOpenRouterCompletion(model, promptContent);
+        case 'deepseek':
+          return await this.generateDeepseekCompletion(model, promptContent);
         default:
           throw new Error(`Provider ${model.provider} is not implemented yet.`);
       }
@@ -543,27 +638,182 @@ Your response should be clear, factual, and directly reference the papers when a
   }
   
   /**
-   * Generate completion using OpenAI API (stub for future implementation)
+   * Generate completion using OpenAI API
    */
   private static async generateOpenAICompletion(model: AIModel, prompt: string): Promise<string> {
-    // Placeholder for OpenAI implementation
-    throw new Error('OpenAI API implementation not available yet');
+    const baseUrl = model.base_url || 'https://api.openai.com/v1';
+    const endpoint = `${baseUrl}/chat/completions`;
+    
+    const payload = {
+      model: model.model_name,
+      messages: [
+        { role: "user", content: prompt }
+      ],
+      stream: false,
+      max_tokens: 1024,
+      temperature: 0.7,
+      top_p: 0.7,
+      frequency_penalty: 0.5,
+      n: 1,
+      response_format: { type: "text" }
+    };
+    
+    try {
+      console.log('Making API request to OpenAI:', endpoint);
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${model.api_key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('OpenAI API response:', data);
+      
+      if (data.choices && data.choices.length > 0) {
+        return data.choices[0].message.content;
+      }
+      
+      throw new Error('No content in API response');
+    } catch (error) {
+      console.error('Error making OpenAI API request:', error);
+      throw error;
+    }
   }
   
   /**
-   * Generate completion using Anthropic API (stub for future implementation)
+   * Generate completion using Anthropic API
    */
   private static async generateAnthropicCompletion(model: AIModel, prompt: string): Promise<string> {
-    // Placeholder for Anthropic implementation
-    throw new Error('Anthropic API implementation not available yet');
+    const baseUrl = model.base_url || 'https://api.anthropic.com/v1';
+    const endpoint = `${baseUrl}/messages`;
+    
+    const payload = {
+      model: model.model_name,
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      top_p: 0.7,
+      top_k: 50,
+      stream: false
+    };
+    
+    try {
+      console.log('Making API request to Anthropic:', endpoint);
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'x-api-key': model.api_key,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Anthropic API response:', data);
+      
+      if (data.content && data.content.length > 0) {
+        return data.content[0].text;
+      }
+      
+      throw new Error('No content in API response');
+    } catch (error) {
+      console.error('Error making Anthropic API request:', error);
+      throw error;
+    }
   }
   
   /**
-   * Generate completion using Google API (stub for future implementation)
+   * Generate completion using Google API
    */
   private static async generateGoogleCompletion(model: AIModel, prompt: string): Promise<string> {
-    // Placeholder for Google implementation
-    throw new Error('Google API implementation not available yet');
+    const baseUrl = model.base_url || 'https://generativelanguage.googleapis.com/v1';
+    const endpoint = `${baseUrl}/models/${model.model_name}:generateContent`;
+    
+    const payload = {
+      contents: [
+        {
+          parts: [
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.7,
+        topK: 50,
+        maxOutputTokens: 1024,
+      },
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_NONE"
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_NONE"
+        }
+      ]
+    };
+    
+    try {
+      console.log('Making API request to Google:', endpoint);
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Google API response:', data);
+      
+      if (data.candidates && data.candidates.length > 0) {
+        return data.candidates[0].content.parts[0].text;
+      }
+      
+      throw new Error('No content in API response');
+    } catch (error) {
+      console.error('Error making Google API request:', error);
+      throw error;
+    }
   }
   
   /**
@@ -618,6 +868,57 @@ Your response should be clear, factual, and directly reference the papers when a
   }
   
   /**
+   * Generate completion using DeepSeek API
+   */
+  private static async generateDeepseekCompletion(model: AIModel, prompt: string): Promise<string> {
+    const baseUrl = model.base_url || 'https://api.deepseek.com';
+    const endpoint = `${baseUrl}/v1/chat/completions`;
+    
+    const payload = {
+      model: model.model_name || 'deepseek-chat',
+      messages: [
+        { role: "system", content: "You are a helpful research assistant." },
+        { role: "user", content: prompt }
+      ],
+      stream: false,
+      max_tokens: 1024,
+      temperature: 0.7,
+      top_p: 0.7,
+      frequency_penalty: 0.5,
+      n: 1
+    };
+    
+    try {
+      console.log('Making DeepSeek API request with payload:', JSON.stringify(payload, null, 2));
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${model.api_key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+      console.log('DeepSeek API response:', data);
+      
+      if (!response.ok) {
+        throw new Error(data.error?.message || `API Error: ${response.status}`);
+      }
+      
+      if (data.choices && data.choices.length > 0) {
+        return data.choices[0].message.content;
+      }
+      
+      throw new Error('No content in API response');
+    } catch (error) {
+      console.error('Error making DeepSeek API request:', error);
+      throw error;
+    }
+  }
+  
+  /**
    * Get model by ID
    */
   static async getModelById(id: string): Promise<AIModel | null> {
@@ -633,7 +934,22 @@ Your response should be clear, factual, and directly reference the papers when a
         throw error;
       }
       
-      return data;
+      if (!data) {
+        return null;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        provider: data.provider,
+        api_key: data.api_key,
+        base_url: data.base_url,
+        model_name: data.model_name,
+        is_default: data.is_default,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        user_id: data.user_id
+      };
     } catch (error) {
       console.error('Error in getModelById:', error);
       return null;

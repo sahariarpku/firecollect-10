@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { FirecrawlService, CrawlProgress, ActivityItem, CrawlResult, PaperData } from '@/services/FirecrawlService';
 import { SearchInput } from '@/components/SearchInput';
@@ -49,6 +48,12 @@ export const ResearchManager = ({ activeTab, initialQuery = '', initialSearchId 
     setContentType('search');
     
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       console.log('Starting search for query:', query);
       const result = await FirecrawlService.processQuery(
         query,
@@ -63,6 +68,28 @@ export const ResearchManager = ({ activeTab, initialQuery = '', initialSearchId 
       if (result.searchId) {
         console.log('Setting searchId:', result.searchId);
         setSearchId(result.searchId);
+
+        // Update search record with user_id
+        const { error: updateError } = await supabase
+          .from('searches')
+          .update({ user_id: user.id })
+          .eq('id', result.searchId);
+
+        if (updateError) {
+          console.error('Error updating search with user_id:', updateError);
+          throw updateError;
+        }
+
+        // Update papers with user_id
+        const { error: papersError } = await supabase
+          .from('papers')
+          .update({ user_id: user.id })
+          .eq('search_id', result.searchId);
+
+        if (papersError) {
+          console.error('Error updating papers with user_id:', papersError);
+          throw papersError;
+        }
       }
       
       setIsActivityLogOpen(true);

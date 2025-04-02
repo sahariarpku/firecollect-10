@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { 
@@ -110,14 +109,12 @@ export const AISettings = ({ isOpen, onOpenChange }: AISettingsProps) => {
     if (confirm('Are you sure you want to delete this AI model?')) {
       try {
         setLoading(true);
-        const success = await AIService.deleteModel(id);
-        if (success) {
-          toast.success('AI model deleted');
-          await fetchModels();
-        }
-      } catch (error) {
+        await AIService.deleteModel(id);
+        toast.success('AI model deleted');
+        await fetchModels();
+      } catch (error: any) {
         console.error('Error deleting model:', error);
-        toast.error('Failed to delete AI model');
+        toast.error(error.message || 'Failed to delete AI model');
       } finally {
         setLoading(false);
       }

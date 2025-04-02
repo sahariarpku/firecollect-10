@@ -183,9 +183,17 @@ const PDFUploadView = ({ existingBatchId, existingBatchName }: PDFUploadViewProp
       
       // Create a new batch only if we don't have an existing one
       if (!existingBatchId) {
+        const { data: user } = await supabase.auth.getUser();
+        if (!user?.user?.id) {
+          throw new Error('User not authenticated');
+        }
+
         const { data: batchData, error: batchError } = await supabase
           .from('pdf_batches')
-          .insert([{ name: batchName }])
+          .insert([{ 
+            name: batchName,
+            user_id: user.user.id
+          }])
           .select();
         
         if (batchError) {
@@ -253,7 +261,8 @@ const PDFUploadView = ({ existingBatchId, existingBatchName }: PDFUploadViewProp
               research_question: sanitizeText(processedFile.extractedData?.research_question),
               major_findings: sanitizeText(processedFile.extractedData?.major_findings),
               suggestions: sanitizeText(processedFile.extractedData?.suggestions),
-              full_text: sanitizeText(processedFile.extractedData?.full_text)
+              full_text: sanitizeText(processedFile.extractedData?.full_text),
+              user_id: user.user.id
             }])
             .select();
             

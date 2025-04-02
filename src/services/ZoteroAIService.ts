@@ -97,6 +97,8 @@ ${papersContext}`;
           return await this.generateSiliconFlowCompletion(model, messages);
         case 'openrouter':
           return await this.generateOpenRouterCompletion(model, messages);
+        case 'deepseek':
+          return await this.generateDeepseekCompletion(model, messages);
         default:
           throw new Error(`Unsupported AI provider: ${model.provider}`);
       }
@@ -215,6 +217,34 @@ ${papersContext}`;
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error?.message || 'OpenRouter API error');
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  }
+
+  private static async generateDeepseekCompletion(model: AIModel, messages: any[]): Promise<string> {
+    const endpoint = `${model.base_url || 'https://api.deepseek.com'}/v1/chat/completions`;
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${model.api_key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model.model_name || 'deepseek-chat',
+        messages,
+        temperature: 0.7,
+        max_tokens: 1000,
+        top_p: 0.7,
+        frequency_penalty: 0.5
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'DeepSeek API error');
     }
 
     const data = await response.json();

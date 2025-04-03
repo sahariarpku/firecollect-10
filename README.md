@@ -21,13 +21,14 @@ Before you begin, ensure you have the following installed:
 - Git
 - Supabase account (for database and authentication)
 - Firecrawl API key (for AI features)
+- Vercel account (for deployment)
 
 ## Setup Instructions
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/sahariarpku/firecollect-5.git
-cd firecollect-5
+git clone https://github.com/sahariarpku/firecollect-10.git
+cd firecollect-10
 ```
 
 ### 2. Install dependencies
@@ -98,25 +99,67 @@ yarn install
    npx supabase db push
    ```
 
-### Troubleshooting Supabase Setup
+### 4. Vercel Deployment
 
-If you encounter any issues:
+#### a. Prepare for Deployment
 
-1. **Wrong Database Connection**
-   - Double-check your database password in `.env.local`
-   - Ensure your project is active in the Supabase dashboard
-   - Try resetting your database password in Supabase dashboard
+1. Create a Vercel account at [vercel.com](https://vercel.com) if you haven't already
+2. Install Vercel CLI:
+   ```bash
+   npm install -g vercel
+   ```
 
-2. **Project Linking Issues**
-   - Verify your project ID is correct
-   - Make sure you're logged in to Supabase CLI (`npx supabase login`)
-   - Check if your project is active in the dashboard
+3. Login to Vercel:
+   ```bash
+   vercel login
+   ```
 
-3. **Permission Issues**
-   - Verify your service role key has the correct permissions
-   - Check if your project's database is not paused
+#### b. Deploy to Vercel
 
-### 4. Start the development server
+1. Push your code to GitHub if you haven't already:
+   ```bash
+   git add .
+   git commit -m "Prepare for Vercel deployment"
+   git push origin main
+   ```
+
+2. Go to [Vercel Dashboard](https://vercel.com/dashboard)
+3. Click "New Project"
+4. Import your GitHub repository
+5. Configure the project:
+   - Framework Preset: Next.js
+   - Root Directory: ./
+   - Build Command: npm run build
+   - Output Directory: .next
+   - Install Command: npm install
+
+6. Add Environment Variables:
+   - Go to Project Settings > Environment Variables
+   - Add the following variables:
+     ```
+     NEXT_PUBLIC_SUPABASE_URL=your_project_url
+     NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+     SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+     SUPABASE_DB_PASSWORD=your_database_password
+     SUPABASE_PROJECT_ID=your_project_id
+     ```
+
+7. Deploy the project:
+   ```bash
+   vercel
+   ```
+
+#### c. Post-Deployment Setup
+
+1. After deployment, go to your project's settings in Vercel
+2. Add your custom domain if desired
+3. Configure any additional settings like:
+   - Environment Variables
+   - Build & Development Settings
+   - Git Integration
+   - Team Collaboration
+
+### 5. Local Development
 ```bash
 npm run dev
 # or
@@ -128,7 +171,7 @@ The application will be available at `http://localhost:3000`
 ## Project Structure
 
 ```
-firecollect-5/
+firecollect-10/
 ├── src/
 │   ├── components/        # React components
 │   ├── services/         # API and service integrations
@@ -171,7 +214,7 @@ Two types of API keys are required:
 ### Common Database Issues
 
 1. **Wrong Database Connection**
-   - Ensure your `.env.local` has the correct Supabase credentials
+   - Ensure your environment variables are correctly set in Vercel
    - Make sure `supabase/config.toml` has the correct project ID
    - Try relinking your project:
      ```bash
@@ -193,6 +236,23 @@ Two types of API keys are required:
 3. **Permission Issues**
    - Verify your service role key has the correct permissions
    - Check RLS policies in Supabase dashboard
+
+### Vercel Deployment Issues
+
+1. **Build Failures**
+   - Check build logs in Vercel dashboard
+   - Verify all dependencies are in package.json
+   - Ensure environment variables are properly set
+
+2. **Runtime Errors**
+   - Check Vercel deployment logs
+   - Verify API endpoints are working
+   - Test locally before deploying
+
+3. **Environment Variables**
+   - Double-check all required variables are set in Vercel
+   - Ensure variables are properly formatted
+   - Test with local environment variables
 
 ## Development
 

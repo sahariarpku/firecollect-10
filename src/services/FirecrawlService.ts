@@ -270,6 +270,13 @@ export class FirecrawlService {
         return;
       }
       
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        throw new Error('User not authenticated');
+      }
+      
       console.log(`Saving ${papers.length} papers with search_id:`, searchId);
       
       // Transform papers to match the database schema
@@ -279,7 +286,8 @@ export class FirecrawlService {
         year: paper.year || null,
         abstract: paper.abstract || null,
         doi: paper.doi || null,
-        search_id: searchId
+        search_id: searchId,
+        user_id: user.id
       }));
       
       // Save papers in batches to avoid overwhelming the database

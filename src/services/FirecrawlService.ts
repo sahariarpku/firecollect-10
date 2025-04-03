@@ -80,10 +80,19 @@ export class FirecrawlService {
     try {
       console.log('Saving API key to Supabase:', apiKey);
       
-      // Check if an API key already exists
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        toast.error('You must be logged in to save API keys');
+        return;
+      }
+      
+      // Check if an API key already exists for this user
       const { data: existingKeys } = await supabase
         .from('firecrawl_api_keys')
         .select('id')
+        .eq('user_id', user.id)
         .limit(1);
         
       if (existingKeys && existingKeys.length > 0) {
@@ -91,7 +100,8 @@ export class FirecrawlService {
         const { error } = await supabase
           .from('firecrawl_api_keys')
           .update({ api_key: apiKey })
-          .eq('id', existingKeys[0].id);
+          .eq('id', existingKeys[0].id)
+          .eq('user_id', user.id);
           
         if (error) {
           console.error('Error updating API key:', error);
@@ -102,7 +112,10 @@ export class FirecrawlService {
         // Insert new API key
         const { error } = await supabase
           .from('firecrawl_api_keys')
-          .insert({ api_key: apiKey });
+          .insert({ 
+            api_key: apiKey,
+            user_id: user.id
+          });
           
         if (error) {
           console.error('Error inserting API key:', error);
@@ -131,10 +144,18 @@ export class FirecrawlService {
     }
     
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        return this.DEFAULT_API_KEY;
+      }
+
       // Try to get the API key from Supabase
       const { data, error } = await supabase
         .from('firecrawl_api_keys')
         .select('api_key')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -157,10 +178,18 @@ export class FirecrawlService {
 
   static async hasApiKey(): Promise<boolean> {
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        return false;
+      }
+
       // Check if we have an API key in Supabase
       const { data, error } = await supabase
         .from('firecrawl_api_keys')
         .select('api_key')
+        .eq('user_id', user.id)
         .limit(1);
         
       if (error) {
